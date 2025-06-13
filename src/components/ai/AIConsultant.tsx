@@ -129,6 +129,7 @@ import {
   Volume2,
   StopCircle,
   CheckCircle2,
+  FileDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -192,6 +193,45 @@ const AIConsultant: React.FC = () => {
     };
   }, []);
   
+  // Fonction pour télécharger l'analyse comme document PDF
+  const handleDownloadAnalysis = () => {
+    if (!response) {
+      toast.error("Aucune analyse à télécharger");
+      return;
+    }
+
+    try {
+      // Version simplifiée qui utilise jsPDF directement
+      // Préparer le contenu du document en texte brut pour plus de fiabilité
+      let documentContent = `ANALYSE DE RISQUES\n`;
+      documentContent += `Généré le ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+      documentContent += `DEMANDE INITIALE:\n${lastPrompt}\n\n`;
+      documentContent += `ANALYSE DÉTAILLÉE:\n${response}`;
+
+      // Créer un blob pour le téléchargement
+      const blob = new Blob([documentContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      // Créer un lien de téléchargement et simuler un clic
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = `analyse-risques-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
+      // Libérer l'URL
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      toast.success("Téléchargement de l'analyse terminé");
+    } catch (error) {
+      console.error("Erreur lors de la génération du document:", error);
+      toast.error("Erreur lors de la génération du document. Veuillez réessayer.");
+    }
+  };
+  
+
+
   // Effet pour faire défiler vers le paragraphe en cours de lecture
   useEffect(() => {
     if (currentParagraphIndex >= 0 && currentParagraphIndex < paragraphRefs.current.length) {
@@ -693,7 +733,31 @@ const AIConsultant: React.FC = () => {
             ) : response ? (
               <div className="space-y-4">
                 <div className="p-4 border-b dark:border-slate-700">
-                  <p className="text-sm text-muted-foreground mb-1">Votre demande initiale :</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-muted-foreground">Votre demande initiale :</p>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleSpeakResponse(response)}
+                        className="flex items-center gap-1"
+                        title={isSpeaking ? "Arrêter la lecture" : "Écouter la réponse"}
+                      >
+                        {isSpeaking ? <StopCircle className="h-4 w-4 text-red-500 animate-pulse" /> : <Volume2 className="h-4 w-4 text-blue-500" />}
+                        {isSpeaking ? "Arrêter" : "Écouter"} 
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleDownloadAnalysis}
+                        className="flex items-center gap-1"
+                        title="Télécharger l'analyse"
+                      >
+                        <FileDown className="h-4 w-4 text-green-600" />
+                        Télécharger
+                      </Button>
+                    </div>
+                  </div>
                   <p className="font-medium italic text-indigo-700 dark:text-indigo-400">{lastPrompt}</p>
                 </div>
                 <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none p-5 bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-800/40 dark:to-gray-800/30 rounded-lg border dark:border-slate-700 shadow-md">
@@ -758,17 +822,7 @@ const AIConsultant: React.FC = () => {
                     </p>;
                   })}
                 </div>
-                <div className="flex items-center justify-between pt-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleSpeakResponse(response)}
-                    className="flex items-center gap-2"
-                    title={isSpeaking ? "Arrêter la lecture" : "Écouter la réponse"}
-                  >
-                    {isSpeaking ? <StopCircle className="h-4 w-4 text-red-500 animate-pulse" /> : <Volume2 className="h-4 w-4 text-blue-500" />}
-                    {isSpeaking ? "Arrêter" : "Écouter"} 
-                  </Button>
+                <div className="flex items-center justify-end gap-2 pt-2">
                   <Button onClick={handleSaveInteraction} size="sm" className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
                     <Save className="h-4 w-4" />
                     Sauvegarder l'analyse
