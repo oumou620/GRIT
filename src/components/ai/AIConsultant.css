@@ -1,0 +1,38 @@
+/* Styles pour le composant AIConsultant */
+
+/* Animation de surbrillance pour le paragraphe en cours de lecture */
+.highlight-paragraph {
+  position: relative;
+  animation: pulse 2s infinite ease-in-out;
+  border-radius: 4px;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+/* Style pour une transition douce des couleurs de fond */
+.transition-colors {
+  transition: background-color 0.5s ease;
+}
+
+/* Ajouter une petite bordure gauche pour indiquer le paragraphe actif */
+.bg-blue-50 {
+  border-left: 3px solid #3b82f6;
+  padding-left: 8px;
+  margin-left: -8px;
+}
+
+.dark .bg-blue-900\/20 {
+  border-left: 3px solid #1d4ed8;
+  padding-left: 8px;
+  margin-left: -8px;
+}

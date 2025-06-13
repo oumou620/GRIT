@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import "./AIConsultant.css";
 
 // Type definitions for Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -165,6 +166,8 @@ const AIConsultant: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [viewingSavedId, setViewingSavedId] = useState<string | null>(null);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState<number>(-1);
+  const paragraphRefs = useRef<(HTMLElement | null)[]>([]);
   
   useEffect(() => {
     const savedData = localStorage.getItem("ai-consultant-saved");
@@ -188,6 +191,31 @@ const AIConsultant: React.FC = () => {
       }
     };
   }, []);
+  
+  // Effet pour faire défiler vers le paragraphe en cours de lecture
+  useEffect(() => {
+    if (currentParagraphIndex >= 0 && currentParagraphIndex < paragraphRefs.current.length) {
+      const currentParagraphElement = paragraphRefs.current[currentParagraphIndex];
+      if (currentParagraphElement) {
+        // Défiler vers le paragraphe avec une animation fluide
+        currentParagraphElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+        
+        // Ajouter une classe de surbrillance au paragraphe actuel (optionnel)
+        currentParagraphElement.classList.add('highlight-paragraph');
+        
+        // Nettoyer la surbrillance précédente
+        return () => {
+          if (currentParagraphElement) {
+            currentParagraphElement.classList.remove('highlight-paragraph');
+          }
+        };
+      }
+    }
+  }, [currentParagraphIndex]);
 
   const handleAnalyze = async () => {
     if (!prompt.trim()) {
@@ -376,6 +404,7 @@ const AIConsultant: React.FC = () => {
     if (isSpeaking) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      setCurrentParagraphIndex(-1);
       return;
     }
 
@@ -385,6 +414,13 @@ const AIConsultant: React.FC = () => {
         setIsSpeaking(true);
         return;
     }
+    
+    // Réinitialiser l'index du paragraphe courant
+    setCurrentParagraphIndex(-1);
+    
+    // Préparer les paragraphes pour le défilement
+    const paragraphs = textToSpeak.split('\n');
+    paragraphRefs.current = new Array(paragraphs.length).fill(null);
 
     // Nettoyer le texte en supprimant les caractères spéciaux de formatage Markdown
     const cleanText = textToSpeak
@@ -403,16 +439,41 @@ const AIConsultant: React.FC = () => {
     
     utteranceRef.current.onstart = () => {
       setIsSpeaking(true);
+      setCurrentParagraphIndex(0); // Commencer au premier paragraphe
     };
 
     utteranceRef.current.onend = () => {
       setIsSpeaking(false);
+      setCurrentParagraphIndex(-1); // Réinitialiser l'index
+    };
+
+    // Ajouter un gestionnaire pour suivre la progression de la parole
+    utteranceRef.current.onboundary = (event) => {
+      if (event.name === 'sentence') {
+        // Estimer le paragraphe actuel en fonction du caractère actuel
+        const paragraphs = textToSpeak.split('\n');
+        let charCount = 0;
+        let currentIndex = 0;
+        
+        for (let i = 0; i < paragraphs.length; i++) {
+          charCount += paragraphs[i].length + 1; // +1 pour le saut de ligne
+          if (event.charIndex < charCount) {
+            currentIndex = i;
+            break;
+          }
+        }
+        
+        if (currentIndex !== currentParagraphIndex) {
+          setCurrentParagraphIndex(currentIndex);
+        }
+      }
     };
 
     utteranceRef.current.onerror = (event) => {
       console.error("Erreur de synthèse vocale:", event.error);
       toast.error("Erreur lors de la lecture de la réponse.");
       setIsSpeaking(false);
+      setCurrentParagraphIndex(-1); // Réinitialiser en cas d'erreur
     };
     
     window.speechSynthesis.speak(utteranceRef.current);
@@ -637,22 +698,64 @@ const AIConsultant: React.FC = () => {
                 </div>
                 <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none p-5 bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-800/40 dark:to-gray-800/30 rounded-lg border dark:border-slate-700 shadow-md">
                   {response.split('\n').map((paragraph, index) => {
+                    // Fonction pour assigner la référence au paragraphe
+                    const assignRef = (el: HTMLElement | null) => {
+                      if (paragraphRefs.current.length > index) {
+                        paragraphRefs.current[index] = el;
+                      }
+                    };
+                    
+                    // Ajouter une classe spéciale pour le paragraphe en cours de lecture
+                    const isCurrentParagraph = index === currentParagraphIndex;
+                    const highlightClass = isCurrentParagraph ? 'bg-blue-50 dark:bg-blue-900/20 transition-colors duration-300' : '';
+                    
                     if (paragraph.startsWith("### ")) {
-                      return <h3 key={index} className="font-semibold text-lg mt-4 mb-2">{paragraph.replace("### ", "")}</h3>;
+                      return <h3 
+                        key={index} 
+                        ref={assignRef} 
+                        className={`font-semibold text-lg mt-4 mb-2 ${highlightClass}`}
+                      >
+                        {paragraph.replace("### ", "")}
+                      </h3>;
                     } else if (paragraph.startsWith("## ")) {
-                      return <h2 key={index} className="font-bold text-xl mt-5 mb-3">{paragraph.replace("## ", "")}</h2>;
+                      return <h2 
+                        key={index} 
+                        ref={assignRef} 
+                        className={`font-bold text-xl mt-5 mb-3 ${highlightClass}`}
+                      >
+                        {paragraph.replace("## ", "")}
+                      </h2>;
                     } else if (paragraph.startsWith("# ")) {
-                      return <h1 key={index} className="font-extrabold text-2xl mt-6 mb-4">{paragraph.replace("# ", "")}</h1>;
+                      return <h1 
+                        key={index} 
+                        ref={assignRef} 
+                        className={`font-extrabold text-2xl mt-6 mb-4 ${highlightClass}`}
+                      >
+                        {paragraph.replace("# ", "")}
+                      </h1>;
                     }
+                    
                     const listItemMatch = paragraph.match(/^\s*[-*+]\s+(.*)/);
                     if (listItemMatch) {
-                      return <ul key={index} className="list-disc list-inside ml-4"><li className="mb-1">{listItemMatch[1]}</li></ul>;
+                      return <ul key={index} ref={assignRef} className={`list-disc list-inside ml-4 ${highlightClass}`}>
+                        <li className="mb-1">{listItemMatch[1]}</li>
+                      </ul>;
                     }
+                    
                     const orderedListItemMatch = paragraph.match(/^\s*\d+\.\s+(.*)/);
                     if (orderedListItemMatch) {
-                      return <ol key={index} className="list-decimal list-inside ml-4"><li className="mb-1">{orderedListItemMatch[1]}</li></ol>;
+                      return <ol key={index} ref={assignRef} className={`list-decimal list-inside ml-4 ${highlightClass}`}>
+                        <li className="mb-1">{orderedListItemMatch[1]}</li>
+                      </ol>;
                     }
-                    return <p key={index} className="mb-2 leading-relaxed">{paragraph}</p>;
+                    
+                    return <p 
+                      key={index} 
+                      ref={assignRef} 
+                      className={`mb-2 leading-relaxed ${highlightClass}`}
+                    >
+                      {paragraph}
+                    </p>;
                   })}
                 </div>
                 <div className="flex items-center justify-between pt-2">
